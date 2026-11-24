@@ -1,0 +1,78 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
+import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
+import { doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
+import { firebaseConfig } from './firebase-config.js';
+
+export async function createCloudSync(callbacks) {
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  let currentUser = null;
+  let unsubscribe = null;
+  let writeTimer = null;
+  let resolveReady;
+  const ready = new Promise(resolve => { resolveReady = resolve; });
+
+  const ledgerRef = user => doc(db, 'users', user.uid, 'ledgers', 'main');
+
+  async function push(data, immediate = false) {
+    if (!currentUser) return;
+    clearTimeout(writeTimer);
+    const write = async () => {
+      callbacks.onStatus('syncing');
+      try {
+        await setDoc(ledgerRef(currentUser), { salaries:data.salaries || {}, expenses:data.expenses || [], updatedAt:serverTimestamp() });
+        callbacks.onStatus('synced');
+      } catch (error) {
+        callbacks.onStatus('error', friendlyError(error));
+      }
+    };
+    if (immediate) return write();
+    writeTimer = setTimeout(write, 450);
+  }
+
+  onAuthStateChanged(auth, user => {
+    currentUser = user;
+    unsubscribe?.();
+    unsubscribe = null;
+    callbacks.onUser(user);
+    resolveReady?.();
+    resolveReady = null;
+    if (!user) {
+      callbacks.onStatus('offline');
+      return;
+    }
+    callbacks.onStatus('syncing');
+    let receivedFirstSnapshot = false;
+    unsubscribe = onSnapshot(ledgerRef(user), snapshot => {
+      if (snapshot.exists()) {
+        const value = snapshot.data();
+        callbacks.onData({salaries:value.salaries || {}, expenses:value.expenses || []});
+        callbacks.onStatus('synced');
+      } else if (!receivedFirstSnapshot) {
+        push(callbacks.getLocalData(), true);
+      }
+      receivedFirstSnapshot = true;
+    }, error => callbacks.onStatus('error', friendlyError(error)));
+  });
+
+  await ready;
+  return {
+    get user() { return currentUser; },
+    signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
+    signUp: (email, password) => createUserWithEmailAndPassword(auth, email, password),
+    signOut: () => firebaseSignOut(auth),
+    push,
+    syncNow: () => push(callbacks.getLocalData(), true)
+  };
+}
+
+function friendlyError(error) {
+  const code = error?.code || '';
+  if (code.includes('invalid-credential')) return 'Incorrect email or password.';
+  if (code.includes('email-already-in-use')) return 'An account already exists for this email.';
+  if (code.includes('weak-password')) return 'Use a password with at least 6 characters.';
+  if (code.includes('network-request-failed')) return 'No internet connection. Changes remain saved on this device.';
+  if (code.includes('permission-denied')) return 'Cloud access was denied. Please sign in again.';
+  return error?.message?.replace(/^Firebase:\s*/, '') || 'Cloud sync could not complete.';
+}

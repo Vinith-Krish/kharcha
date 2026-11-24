@@ -19,6 +19,10 @@ const state=loadState();
 let selectedMonth=currentMonthKey();
 let recognition=null;
 let toastTimer;
+let cloudApi=null;
+let cloudUser=null;
+let applyingCloudData=false;
+let authMode='signin';
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:Math.abs(n%1)>0?2:0}).format(Number(n)||0);
@@ -28,7 +32,7 @@ const escapeHtml=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>'
 function loadState(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{salaries:{},expenses:[]};}catch{return {salaries:{},expenses:[]};}
 }
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!applyingCloudData)cloudApi?.push(state);}
 function salaryFor(key){return Number(state.salaries[key]||0);}
 function monthExpenses(key){return state.expenses.filter(e=>e.date.startsWith(key));}
 function totalFor(key){return monthExpenses(key).reduce((sum,e)=>sum+Number(e.amount),0);}
@@ -108,6 +112,40 @@ function startVoice(){
   recognition.onend=()=>{recognition=null;document.querySelectorAll('#voiceBtn,#mobileVoiceBtn').forEach(b=>b.classList.remove('listening'));$('voiceBtn').querySelector('strong').textContent='Speak an expense';};recognition.start();
 }
 function showToast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').classList.add('show');toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3200);}
+function setSyncStatus(status,message=''){
+  const chip=$('syncStatusBtn');chip.className=`sync-chip ${status}`;
+  const labels={offline:'Device only',syncing:'Syncing…',synced:'Synced',error:'Sync issue',setup:'Sync setup'};
+  chip.querySelector('b').textContent=labels[status]||'Cloud sync';
+  if(message&&status==='error')showToast(message);
+}
+function updateAuthUi(user){
+  cloudUser=user;$('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
+  $('authHelp').hidden=!!user;$('authTitle').textContent=user?'Cloud sync is on':'Sign in to sync';$('signedInEmail').textContent=user?.email||'';
+}
+function openAuthDialog(){
+  $('authError').textContent='';updateAuthUi(cloudUser);$('authDialog').showModal();
+  if(!cloudUser)setTimeout(()=>$('authEmail').focus(),80);
+}
+function setAuthMode(mode){
+  authMode=mode;const creating=mode==='signup';$('authTitle').textContent=creating?'Create your sync account':'Sign in to sync';
+  $('authSwitchBtn').textContent=creating?'I already have an account':'Create account';$('signedOutActions').querySelector('.primary-btn').textContent=creating?'Create & sync':'Sign in';
+  $('authPassword').autocomplete=creating?'new-password':'current-password';$('authError').textContent='';
+}
+function authErrorMessage(error){
+  const code=error?.code||'';if(code.includes('invalid-credential'))return'Incorrect email or password.';if(code.includes('email-already-in-use'))return'An account already exists for this email.';if(code.includes('weak-password'))return'Use a password with at least 6 characters.';if(code.includes('operation-not-allowed'))return'Email sign-in is still being enabled. Please try again shortly.';return error?.message?.replace(/^Firebase:\s*/,'')||'Could not sign in.';
+}
+async function initializeCloud(){
+  setSyncStatus('syncing');
+  try{
+    const {createCloudSync}=await import('./sync.js');
+    cloudApi=await createCloudSync({
+      getLocalData:()=>({salaries:state.salaries,expenses:state.expenses}),
+      onData:data=>{applyingCloudData=true;state.salaries=data.salaries||{};state.expenses=data.expenses||[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
+      onUser:user=>updateAuthUi(user),
+      onStatus:setSyncStatus
+    });
+  }catch(error){setSyncStatus('error','Cloud sync is temporarily unavailable. Your device copy is safe.');console.error(error);}
+}
 function exportCsv(){
   if(!state.expenses.length){showToast('There are no expenses to export yet.');return;}
   const rows=[['Date','Description','Category','Payment mode','Amount (INR)'],...state.expenses.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.note,e.category,e.payment,e.amount])];
@@ -125,8 +163,14 @@ $('transactionList').addEventListener('click',e=>{const id=e.target.dataset.dele
 $('allTransactionsBtn').addEventListener('click',()=>{renderTransactions(true);$('allTransactionsBtn').hidden=true;});
 ['exportBtn','settingsExportBtn'].forEach(id=>$(id).addEventListener('click',exportCsv));
 $('settingsBtn').addEventListener('click',()=>$('settingsDialog').showModal());document.querySelector('[data-close="settings"]').addEventListener('click',()=>$('settingsDialog').close());
+$('syncStatusBtn').addEventListener('click',openAuthDialog);
+$('authSwitchBtn').addEventListener('click',()=>setAuthMode(authMode==='signin'?'signup':'signin'));
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi)return;$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{if(authMode==='signup')await cloudApi.signUp(email,password);else await cloudApi.signIn(email,password);$('authDialog').close();showToast(authMode==='signup'?'Account created. Your device records are syncing.':'Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
+$('syncNowBtn').addEventListener('click',async()=>{await cloudApi?.syncNow();$('authDialog').close();showToast('Cloud sync refreshed.');});
+$('signOutBtn').addEventListener('click',async()=>{await cloudApi?.signOut();$('authDialog').close();showToast('Signed out. Records remain saved on this device.');});
 $('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast('All local data cleared.');}});
 document.querySelectorAll('.nav-item').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close();}));
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 render();
+initializeCloud();

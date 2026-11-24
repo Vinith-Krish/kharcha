@@ -39,6 +39,7 @@
           <h1>Your money, at a glance.</h1>
         </div>
         <div class="header-actions">
+          <button class="sync-chip offline" id="syncStatusBtn" aria-label="Open sync settings"><span>●</span><b>Device only</b></button>
           <label class="month-picker">
             <span class="sr-only">Select month</span>
             <input id="monthPicker" type="month">
@@ -128,6 +129,21 @@
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
     <p class="form-help">Kharcha stores everything in your browser. Export a backup before clearing this device.</p>
     <div class="settings-actions"><button class="secondary-btn" id="settingsExportBtn">Export CSV backup</button><button class="danger-btn" id="clearDataBtn">Clear all data</button></div>
+  </dialog>
+
+  <dialog id="authDialog" class="dialog small-dialog">
+    <form method="dialog" id="authForm">
+      <div class="dialog-head"><div><p class="eyebrow">PRIVATE CLOUD SYNC</p><h2 id="authTitle">Sign in to sync</h2></div><button class="close-btn" value="cancel" aria-label="Close">×</button></div>
+      <p class="form-help" id="authHelp">Use the same account on your phone and laptop. Only your signed-in account can read your records.</p>
+      <div class="signed-in-card" id="signedInCard" hidden><span class="cloud-badge">☁</span><div><strong id="signedInEmail"></strong><small>Your records are syncing securely.</small></div></div>
+      <div id="authFields">
+        <label>Email address<input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+        <label>Password<input id="authPassword" type="password" minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters" required></label>
+        <p class="form-error" id="authError" role="alert"></p>
+      </div>
+      <div class="dialog-actions auth-actions" id="signedOutActions"><button class="text-button" id="authSwitchBtn" type="button">Create account</button><button class="primary-btn" type="submit">Sign in</button></div>
+      <div class="settings-actions" id="signedInActions" hidden><button class="secondary-btn" id="syncNowBtn" type="button">Sync now</button><button class="danger-btn" id="signOutBtn" type="button">Sign out</button></div>
+    </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

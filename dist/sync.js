@@ -46,11 +46,20 @@ export async function createCloudSync(callbacks) {
     let receivedFirstSnapshot = false;
     unsubscribe = onSnapshot(ledgerRef(user), snapshot => {
       if (snapshot.exists()) {
-        const value = snapshot.data();
-        callbacks.onData({salaries:value.salaries || {}, expenses:value.expenses || []});
-        callbacks.onStatus('synced');
+        const remote = normalizeSyncData(snapshot.data());
+        if (!receivedFirstSnapshot) {
+          const local = normalizeSyncData(callbacks.getLocalData());
+          const merged = mergeLedgers(local, remote);
+          callbacks.onData(merged);
+          push(merged, true);
+        } else {
+          callbacks.onData(remote);
+          callbacks.onStatus('synced');
+        }
       } else if (!receivedFirstSnapshot) {
-        push(callbacks.getLocalData(), true);
+        push(normalizeSyncData(callbacks.getLocalData()), true);
+      } else {
+        callbacks.onStatus('synced');
       }
       receivedFirstSnapshot = true;
     }, error => callbacks.onStatus('error', friendlyError(error)));
@@ -62,9 +71,31 @@ export async function createCloudSync(callbacks) {
     signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
     signUp: (email, password) => createUserWithEmailAndPassword(auth, email, password),
     signOut: () => firebaseSignOut(auth),
-    push,
-    syncNow: () => push(callbacks.getLocalData(), true)
+    push: (data, immediate = false) => push(normalizeSyncData(data || callbacks.getLocalData()), immediate),
+    syncNow: () => push(normalizeSyncData(callbacks.getLocalData()), true)
   };
+}
+
+function normalizeSyncData(data) {
+  const source = data && typeof data === 'object' ? data : {};
+  const salaries = source.salaries && typeof source.salaries === 'object' ? source.salaries : {};
+  const expenses = Array.isArray(source.expenses) ? source.expenses : [];
+  return { salaries, expenses };
+}
+
+function mergeLedgers(local, remote) {
+  const salaries = { ...(remote.salaries || {}) };
+  Object.entries(local.salaries || {}).forEach(([key, value]) => {
+    if (!(key in salaries)) salaries[key] = value;
+  });
+  const byId = new Map();
+  (remote.expenses || []).forEach(expense => {
+    if (expense && typeof expense === 'object' && expense.id) byId.set(expense.id, expense);
+  });
+  (local.expenses || []).forEach(expense => {
+    if (expense && typeof expense === 'object' && expense.id && !byId.has(expense.id)) byId.set(expense.id, expense);
+  });
+  return { salaries, expenses: [...byId.values()] };
 }
 
 function friendlyError(error) {

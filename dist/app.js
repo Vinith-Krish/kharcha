@@ -12,6 +12,7 @@ const CATEGORIES = [
   {name:'Other', icon:'✨', color:'#8b948f', terms:[]}
 ];
 const PAYMENT_COLORS={'UPI':'#1f654e','Cash':'#eda23e','Credit Card':'#6d76ad','Debit Card':'#5792a0','Net Banking':'#9b7559','Other':'#909891'};
+const PAYMENT_OPTIONS=['UPI','Cash','Credit Card','Debit Card','Net Banking','Other'];
 const STORAGE_KEY='kharcha.v1';
 const today=new Date();
 const currentMonthKey=()=>`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
@@ -28,9 +29,42 @@ const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:Math.abs(n%1)>0?2:0}).format(Number(n)||0);
 const monthLabel=key=>new Date(`${key}-02T00:00:00`).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
 const escapeHtml=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const isMonthKey=key=>/^\d{4}-(0[1-9]|1[0-2])$/.test(key||'');
+const isIsoDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&!Number.isNaN(new Date(`${value}T12:00:00`).getTime());
+const csvSafe=value=>{const text=String(value??'');return /^[=+\-@\t]/.test(text)?`'${text}`:text;};
+
+function normalizeState(raw){
+  const source=raw&&typeof raw==='object'?raw:{};
+  const salaries={};
+  if(source.salaries&&typeof source.salaries==='object'){
+    Object.entries(source.salaries).forEach(([key,value])=>{
+      if(!isMonthKey(key))return;
+      const amount=Number(value);
+      if(Number.isFinite(amount)&&amount>=0)salaries[key]=Math.round(amount*100)/100;
+    });
+  }
+  const expenses=[];
+  const seen=new Set();
+  if(Array.isArray(source.expenses)){
+    source.expenses.forEach(item=>{
+      if(!item||typeof item!=='object')return;
+      const amount=Number(item.amount);
+      const date=isIsoDate(item.date)?item.date:new Date().toISOString().slice(0,10);
+      if(!Number.isFinite(amount)||amount<=0)return;
+      const id=typeof item.id==='string'&&item.id.trim()?item.id.trim():(crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`);
+      if(seen.has(id))return; seen.add(id);
+      const note=String(item.note||'Expense').trim().slice(0,60)||'Expense';
+      const category=CATEGORIES.some(c=>c.name===item.category)?item.category:'Other';
+      const payment=PAYMENT_OPTIONS.includes(item.payment)?item.payment:'Other';
+      const createdAt=Number.isFinite(Number(item.createdAt))?Number(item.createdAt):Date.now();
+      expenses.push({id,amount:Math.round(amount*100)/100,note,category,payment,date,createdAt});
+    });
+  }
+  return {salaries,expenses};
+}
 
 function loadState(){
-  try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{salaries:{},expenses:[]};}catch{return {salaries:{},expenses:[]};}
+  try{return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'));}catch{return {salaries:{},expenses:[]};}
 }
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!applyingCloudData)cloudApi?.push(state);}
 function salaryFor(key){return Number(state.salaries[key]||0);}
@@ -39,7 +73,7 @@ function totalFor(key){return monthExpenses(key).reduce((sum,e)=>sum+Number(e.am
 function previousMonth(key){const [y,m]=key.split('-').map(Number);const d=new Date(y,m-2,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function carryFor(key,depth=0){
   if(depth>120)return 0;
-  const prev=previousMonth(key);const hasPrev=salaryFor(prev)>0||monthExpenses(prev).length>0;
+  const prev=previousMonth(key);const hasPrev=Object.prototype.hasOwnProperty.call(state.salaries,prev)||monthExpenses(prev).length>0;
   if(!hasPrev)return 0;
   return Math.max(0,salaryFor(prev)+carryFor(prev,depth+1)-totalFor(prev));
 }
@@ -86,6 +120,9 @@ function renderPayments(total){
 function renderTransactions(showAll=false){
   const expenses=monthExpenses(selectedMonth).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
   const shown=showAll?expenses:expenses.slice(0,6);
+  const allBtn=$('allTransactionsBtn');
+  allBtn.hidden=showAll||expenses.length<=6;
+  if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
   $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><button class="delete-btn" data-delete="${e.id}" aria-label="Delete ${escapeHtml(e.note)}">×</button></div>`}).join('');
 }
@@ -121,6 +158,8 @@ function setSyncStatus(status,message=''){
 function updateAuthUi(user){
   cloudUser=user;$('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
   $('authHelp').hidden=!!user;$('authTitle').textContent=user?'Cloud sync is on':'Sign in to sync';$('signedInEmail').textContent=user?.email||'';
+  const note=document.querySelector('.privacy-note p');
+  if(note)note.textContent=user?'Your data stays on this device and in your private cloud account.':'Stored on this device. Sign in to sync privately across devices.';
 }
 function openAuthDialog(){
   $('authError').textContent='';updateAuthUi(cloudUser);$('authDialog').showModal();
@@ -140,7 +179,7 @@ async function initializeCloud(){
     const {createCloudSync}=await import('./sync.js');
     cloudApi=await createCloudSync({
       getLocalData:()=>({salaries:state.salaries,expenses:state.expenses}),
-      onData:data=>{applyingCloudData=true;state.salaries=data.salaries||{};state.expenses=data.expenses||[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
+      onData:data=>{const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
       onUser:user=>updateAuthUi(user),
       onStatus:setSyncStatus
     });
@@ -149,7 +188,7 @@ async function initializeCloud(){
 function exportCsv(){
   if(!state.expenses.length){showToast('There are no expenses to export yet.');return;}
   const rows=[['Date','Description','Category','Payment mode','Amount (INR)'],...state.expenses.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.note,e.category,e.payment,e.amount])];
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob([`\uFEFF${csv}`],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kharcha-expenses-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);showToast('CSV exported.');
+  const csv=rows.map(r=>r.map(v=>`"${csvSafe(v).replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob([`\uFEFF${csv}`],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kharcha-expenses-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);showToast('CSV exported.');
 }
 
 $('expenseCategory').innerHTML=CATEGORIES.map(c=>`<option>${c.name}</option>`).join('');$('monthPicker').value=selectedMonth;
@@ -165,10 +204,10 @@ $('allTransactionsBtn').addEventListener('click',()=>{renderTransactions(true);$
 $('settingsBtn').addEventListener('click',()=>$('settingsDialog').showModal());document.querySelector('[data-close="settings"]').addEventListener('click',()=>$('settingsDialog').close());
 $('syncStatusBtn').addEventListener('click',openAuthDialog);
 $('authSwitchBtn').addEventListener('click',()=>setAuthMode(authMode==='signin'?'signup':'signin'));
-$('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi)return;$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{if(authMode==='signup')await cloudApi.signUp(email,password);else await cloudApi.signIn(email,password);$('authDialog').close();showToast(authMode==='signup'?'Account created. Your device records are syncing.':'Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
-$('syncNowBtn').addEventListener('click',async()=>{await cloudApi?.syncNow();$('authDialog').close();showToast('Cloud sync refreshed.');});
-$('signOutBtn').addEventListener('click',async()=>{await cloudApi?.signOut();$('authDialog').close();showToast('Signed out. Records remain saved on this device.');});
-$('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast('All local data cleared.');}});
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi){$('authError').textContent='Cloud sync is unavailable right now. Your device copy remains saved.';return;}$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{if(authMode==='signup')await cloudApi.signUp(email,password);else await cloudApi.signIn(email,password);$('authDialog').close();showToast(authMode==='signup'?'Account created. Your device records are syncing.':'Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
+$('syncNowBtn').addEventListener('click',async()=>{if(!cloudApi||!cloudUser){$('authDialog').close();showToast('Sign in to sync your records.');return;}await cloudApi.syncNow();$('authDialog').close();showToast('Cloud sync refreshed.');});
+$('signOutBtn').addEventListener('click',async()=>{if(!cloudApi){$('authDialog').close();return;}await cloudApi.signOut();$('authDialog').close();showToast('Signed out. Records remain saved on this device.');});
+$('clearDataBtn').addEventListener('click',()=>{const msg=cloudUser?'Clear every salary and expense from this device and your signed-in cloud sync? Export first if you need a backup.':'Clear every salary and expense from this device? Export first if you need a backup.';if(confirm(msg)){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast(cloudUser?'All data cleared from this device and cloud sync.':'All local data cleared.');}});
 document.querySelectorAll('.nav-item').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close();}));
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

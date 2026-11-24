@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#16372c">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'">
   <meta name="description" content="Kharcha is a private Indian salary and expense tracker with voice entry, UPI tracking, and monthly carry-forward.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -27,7 +29,7 @@
       </nav>
       <div class="privacy-note">
         <span class="privacy-icon">⌾</span>
-        <div><strong>Private by design</strong><p>Your money data stays on this device.</p></div>
+        <div><strong>Private by design</strong><p>Stored on this device. Sign in to sync privately across devices.</p></div>
       </div>
       <button class="text-button" id="exportBtn">Export as CSV</button>
     </aside>
@@ -127,7 +129,7 @@
 
   <dialog id="settingsDialog" class="dialog small-dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
-    <p class="form-help">Kharcha stores everything in your browser. Export a backup before clearing this device.</p>
+    <p class="form-help">Kharcha stores records on this device. If you sign in, the same private account can sync them across devices. Export a backup before clearing this device.</p>
     <div class="settings-actions"><button class="secondary-btn" id="settingsExportBtn">Export CSV backup</button><button class="danger-btn" id="clearDataBtn">Clear all data</button></div>
   </dialog>
 

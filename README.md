@@ -10,8 +10,7 @@ Kharcha is a responsive, privacy-friendly salary and expense tracker built for I
 - Category and payment-mode analytics
 - CSV export
 - Offline-capable progressive web app
-- Browser-local storage; no account or backend required
-- Optional Firebase account sync for the same private records across devices
+- Browser-local storage with optional private Firebase account sync across devices
 
 ## Run locally
 
@@ -31,5 +30,5 @@ The included workflow publishes `dist` whenever changes are pushed to `main`. In
 
 ## Cross-device sync
 
-Create an account from the **Device only** button in the app, then sign in with the same email and password on every device. Records are cached locally for offline use and synchronized to the signed-in user's private Firestore document. Firebase security rules restrict each user to their own data.
+Create an account from the sync/status button in the app, then sign in with the same email and password on every device. Records are cached locally for offline use and synchronized to the signed-in user's private Firestore document. Firestore security rules restrict each user to their own data. On first sign-in to an existing cloud account, local and cloud records are merged to avoid accidental data loss.
 

@@ -22,5 +22,9 @@ npx serve dist
 
 ## Deploy to GitHub Pages
 
+This project is configured for the `Vinith-Krish/kharcha` repository and will be published at:
+
+**https://vinith-krish.github.io/kharcha/**
+
 The included workflow publishes `dist` whenever changes are pushed to `main`. In the GitHub repository settings, set Pages → Source to **GitHub Actions**.
 

@@ -1,0 +1,26 @@
+# Kharcha — Indian Expense Tracker
+
+Kharcha is a responsive, privacy-friendly salary and expense tracker built for Indian households. It supports monthly salary planning, automatic carry-forward, category analytics, cash/UPI tracking, and voice-assisted expense entry.
+
+## Features
+
+- Monthly salary and automatic balance carry-forward
+- Indian rupee formatting and India-focused categories
+- Voice input such as “450 groceries via UPI”
+- Category and payment-mode analytics
+- CSV export
+- Offline-capable progressive web app
+- Browser-local storage; no account or backend required
+
+## Run locally
+
+Serve the `dist` directory with any static web server, for example:
+
+```powershell
+npx serve dist
+```
+
+## Deploy to GitHub Pages
+
+The included workflow publishes `dist` whenever changes are pushed to `main`. In the GitHub repository settings, set Pages → Source to **GitHub Actions**.
+

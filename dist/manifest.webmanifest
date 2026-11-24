@@ -1,0 +1,12 @@
+{
+  "name": "Kharcha — Expense Tracker",
+  "short_name": "Kharcha",
+  "description": "A private Indian salary and expense tracker.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7f3",
+  "theme_color": "#16372c",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16372c">
+  <meta name="description" content="Kharcha is a private Indian salary and expense tracker with voice entry, UPI tracking, and monthly carry-forward.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <title>Kharcha — Expense Tracker</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#top" aria-label="Kharcha home">
+        <span class="brand-mark">₹</span>
+        <span><strong>Kharcha</strong><small>खर्चा, clearly.</small></span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a class="nav-item active" href="#dashboard"><span>⌂</span> Dashboard</a>
+        <a class="nav-item" href="#transactions"><span>↕</span> Transactions</a>
+        <a class="nav-item" href="#insights"><span>◔</span> Insights</a>
+      </nav>
+      <div class="privacy-note">
+        <span class="privacy-icon">⌾</span>
+        <div><strong>Private by design</strong><p>Your money data stays on this device.</p></div>
+      </div>
+      <button class="text-button" id="exportBtn">Export as CSV</button>
+    </aside>
+
+    <main id="top">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">NAMASTE</p>
+          <h1>Your money, at a glance.</h1>
+        </div>
+        <div class="header-actions">
+          <label class="month-picker">
+            <span class="sr-only">Select month</span>
+            <input id="monthPicker" type="month">
+          </label>
+          <button class="avatar" id="settingsBtn" aria-label="Open data settings">₹</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="balance-card" aria-labelledby="balanceTitle">
+        <div class="balance-copy">
+          <p class="card-label" id="balanceTitle">AVAILABLE THIS MONTH</p>
+          <div class="balance-row"><h2 id="availableBalance">₹0</h2><span class="status-pill" id="balanceStatus">On track</span></div>
+          <p class="balance-context" id="balanceContext">Add your salary to begin tracking.</p>
+          <div class="progress-track" aria-label="Monthly budget used"><span id="budgetProgress"></span></div>
+          <div class="budget-legend"><span><i class="dot spent"></i><b id="spentLabel">₹0 spent</b></span><span><i class="dot safe"></i><b id="remainingLabel">₹0 left</b></span></div>
+        </div>
+        <div class="income-panel">
+          <div><span>Monthly salary</span><strong id="salaryValue">₹0</strong></div>
+          <div><span>Carried forward</span><strong id="carryValue">₹0</strong></div>
+          <button class="secondary-btn" id="salaryBtn">Set salary</button>
+        </div>
+      </section>
+
+      <section class="quick-actions" aria-label="Quick actions">
+        <button class="voice-action" id="voiceBtn">
+          <span class="mic-icon" aria-hidden="true">●</span>
+          <span><strong>Speak an expense</strong><small>“₹450 groceries via UPI”</small></span>
+          <span class="voice-wave"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button class="add-action" id="addExpenseBtn"><span>+</span> Add expense</button>
+      </section>
+
+      <section id="insights" class="analytics-grid">
+        <article class="panel category-panel">
+          <div class="panel-heading"><div><p class="card-label">SPENDING BREAKDOWN</p><h3>Where it went</h3></div><span class="muted" id="categoryCount">0 categories</span></div>
+          <div class="category-content">
+            <div class="donut" id="categoryDonut" role="img" aria-label="Spending by category"><div><span>Total spent</span><strong id="donutTotal">₹0</strong></div></div>
+            <div class="legend-list" id="categoryLegend"><p class="empty-mini">Your category mix will appear here.</p></div>
+          </div>
+        </article>
+        <article class="panel payment-panel">
+          <div class="panel-heading"><div><p class="card-label">PAYMENT MIX</p><h3>Cash or digital?</h3></div></div>
+          <div class="payment-bars" id="paymentBars"></div>
+          <div class="upi-callout"><span class="upi-logo">UPI</span><p><strong>Digital pulse</strong><small id="upiInsight">Add expenses to see your payment habits.</small></p></div>
+        </article>
+      </section>
+
+      <section id="transactions" class="panel transactions-panel">
+        <div class="panel-heading">
+          <div><p class="card-label">TRANSACTIONS</p><h3>Recent expenses</h3></div>
+          <button class="filter-btn" id="allTransactionsBtn">View all</button>
+        </div>
+        <div class="transaction-list" id="transactionList"></div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="#dashboard"><span>⌂</span>Home</a><a href="#insights"><span>◔</span>Insights</a><button id="mobileAddBtn" aria-label="Add expense">+</button><a href="#transactions"><span>↕</span>Expenses</a><button id="mobileVoiceBtn"><span>●</span>Voice</button>
+  </nav>
+
+  <dialog id="expenseDialog" class="dialog">
+    <form method="dialog" id="expenseForm">
+      <div class="dialog-head"><div><p class="eyebrow">NEW ENTRY</p><h2>Add an expense</h2></div><button class="close-btn" value="cancel" aria-label="Close">×</button></div>
+      <div class="voice-transcript" id="voiceTranscript" hidden><span>Voice heard</span><p></p></div>
+      <label>Amount (₹)<input id="expenseAmount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 450" required></label>
+      <label>What was it for?<input id="expenseNote" name="note" type="text" maxlength="60" placeholder="e.g. Weekly vegetables" required></label>
+      <div class="form-grid">
+        <label>Category<select id="expenseCategory" name="category"></select></label>
+        <label>Paid using<select id="expensePayment" name="payment"><option>UPI</option><option>Cash</option><option>Credit Card</option><option>Debit Card</option><option>Net Banking</option><option>Other</option></select></label>
+      </div>
+      <label>Date<input id="expenseDate" name="date" type="date" required></label>
+      <div class="dialog-actions"><button class="secondary-btn" value="cancel">Cancel</button><button class="primary-btn" type="submit" value="default">Save expense</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="salaryDialog" class="dialog small-dialog">
+    <form method="dialog" id="salaryForm">
+      <div class="dialog-head"><div><p class="eyebrow">MONTHLY BASE</p><h2>Set your salary</h2></div><button class="close-btn" value="cancel" aria-label="Close">×</button></div>
+      <p class="form-help">This amount becomes the base for the selected month. Any balance from the previous month is added automatically.</p>
+      <label>Salary received (₹)<input id="salaryInput" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 75000" required></label>
+      <div class="dialog-actions"><button class="secondary-btn" value="cancel">Cancel</button><button class="primary-btn" type="submit" value="default">Save salary</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="dialog small-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
+    <p class="form-help">Kharcha stores everything in your browser. Export a backup before clearing this device.</p>
+    <div class="settings-actions"><button class="secondary-btn" id="settingsExportBtn">Export CSV backup</button><button class="danger-btn" id="clearDataBtn">Clear all data</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>

@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAnd
 import { doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
-const OWNER_EMAIL = 'vinithkrishna20@gmail.com';
+const OWNER_UID = '2pwPvR1h1FRxXgux3Z9Xsn2jPlj2';
 
 export async function createCloudSync(callbacks) {
   const app = initializeApp(firebaseConfig);
@@ -39,7 +39,7 @@ export async function createCloudSync(callbacks) {
     clearTimeout(writeTimer);
     unsubscribe?.();
     unsubscribe = null;
-    currentUser = user?.email?.toLowerCase() === OWNER_EMAIL ? user : null;
+    currentUser = user?.uid === OWNER_UID ? user : null;
     callbacks.onUser(currentUser);
     resolveReady?.();
     resolveReady = null;
@@ -76,12 +76,15 @@ export async function createCloudSync(callbacks) {
   return {
     get user() { return currentUser; },
     signIn: async (email, password) => {
-      if (email.trim().toLowerCase() !== OWNER_EMAIL) throw new Error('This account is not allowed to use this app.');
-      return signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (result.user.uid !== OWNER_UID) {
+        await firebaseSignOut(auth);
+        throw new Error('This account is not allowed to use this app.');
+      }
+      return result;
     },
     requestPasswordReset: async email => {
-      if (email.trim().toLowerCase() !== OWNER_EMAIL) return;
-      await sendPasswordResetEmail(auth, OWNER_EMAIL);
+      await sendPasswordResetEmail(auth, email.trim());
     },
     signOut: async () => {
       if (!await push(normalizeSyncData(callbacks.getLocalData()), true)) {

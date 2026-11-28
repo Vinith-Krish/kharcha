@@ -216,7 +216,7 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
   const button=$('resetPasswordBtn');button.disabled=true;
   try{
     await cloudApi.requestPasswordReset(email);
-    $('resetStatus').textContent='If this is the owner account, a password reset link has been sent. Check your inbox and spam folder.';
+    $('resetStatus').textContent='If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.';
     $('resetStatus').hidden=false;
     setTimeout(()=>{button.disabled=false;},60000);
   }catch(error){

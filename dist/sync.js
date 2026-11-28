@@ -1,7 +1,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
-import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
 import { doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+
+const OWNER_EMAIL = 'vinithkrishna20@gmail.com';
 
 export async function createCloudSync(callbacks) {
   const app = initializeApp(firebaseConfig);
@@ -23,8 +25,10 @@ export async function createCloudSync(callbacks) {
       try {
         await setDoc(ledgerRef(currentUser), { salaries:data.salaries || {}, expenses:data.expenses || [], updatedAt:serverTimestamp() });
         callbacks.onStatus('synced');
+        return true;
       } catch (error) {
         callbacks.onStatus('error', friendlyError(error));
+        return false;
       }
     };
     if (immediate) return write();
@@ -32,19 +36,22 @@ export async function createCloudSync(callbacks) {
   }
 
   onAuthStateChanged(auth, user => {
-    currentUser = user;
+    clearTimeout(writeTimer);
     unsubscribe?.();
     unsubscribe = null;
-    callbacks.onUser(user);
+    currentUser = user?.email?.toLowerCase() === OWNER_EMAIL ? user : null;
+    callbacks.onUser(currentUser);
     resolveReady?.();
     resolveReady = null;
-    if (!user) {
+    if (!currentUser) {
       callbacks.onStatus('offline');
+      if (user) firebaseSignOut(auth);
       return;
     }
     callbacks.onStatus('syncing');
     let receivedFirstSnapshot = false;
-    unsubscribe = onSnapshot(ledgerRef(user), snapshot => {
+    unsubscribe = onSnapshot(ledgerRef(currentUser), snapshot => {
+      if (auth.currentUser?.uid !== user.uid) return;
       if (snapshot.exists()) {
         const remote = normalizeSyncData(snapshot.data());
         if (!receivedFirstSnapshot) {
@@ -68,9 +75,16 @@ export async function createCloudSync(callbacks) {
   await ready;
   return {
     get user() { return currentUser; },
-    signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
-    signUp: (email, password) => createUserWithEmailAndPassword(auth, email, password),
-    signOut: () => firebaseSignOut(auth),
+    signIn: async (email, password) => {
+      if (email.trim().toLowerCase() !== OWNER_EMAIL) throw new Error('This account is not allowed to use this app.');
+      return signInWithEmailAndPassword(auth, email, password);
+    },
+    signOut: async () => {
+      if (!await push(normalizeSyncData(callbacks.getLocalData()), true)) {
+        throw new Error('Could not save your latest changes. Check your connection before signing out.');
+      }
+      return firebaseSignOut(auth);
+    },
     push: (data, immediate = false) => push(normalizeSyncData(data || callbacks.getLocalData()), immediate),
     syncNow: () => push(normalizeSyncData(callbacks.getLocalData()), true)
   };

@@ -16,7 +16,10 @@
   <title>Kharcha — Expense Tracker</title>
 </head>
 <body>
-  <div class="app-shell">
+  <section id="accessGate" class="access-gate">
+    <div class="access-card"><span class="brand-mark">₹</span><h1>Kharcha is private</h1><p>Sign in with your account to view your expenses.</p><button class="primary-btn" id="gateSignInBtn" type="button">Sign in</button><p class="form-error" id="gateError" role="alert"></p></div>
+  </section>
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar">
       <a class="brand" href="#top" aria-label="Kharcha home">
         <span class="brand-mark">₹</span>
@@ -99,7 +102,7 @@
     </main>
   </div>
 
-  <nav class="mobile-nav" aria-label="Mobile navigation">
+  <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
     <a href="#dashboard"><span>⌂</span>Home</a><a href="#insights"><span>◔</span>Insights</a><button id="mobileAddBtn" aria-label="Add expense">+</button><a href="#transactions"><span>↕</span>Expenses</a><button id="mobileVoiceBtn"><span>●</span>Voice</button>
   </nav>
 
@@ -129,21 +132,21 @@
 
   <dialog id="settingsDialog" class="dialog small-dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
-    <p class="form-help">Kharcha stores records on this device. If you sign in, the same private account can sync them across devices. Export a backup before clearing this device.</p>
+    <p class="form-help">Your signed-in account syncs records across devices. Signing out removes this device's copy. Export a backup before clearing your records.</p>
     <div class="settings-actions"><button class="secondary-btn" id="settingsExportBtn">Export CSV backup</button><button class="danger-btn" id="clearDataBtn">Clear all data</button></div>
   </dialog>
 
   <dialog id="authDialog" class="dialog small-dialog">
     <form method="dialog" id="authForm">
       <div class="dialog-head"><div><p class="eyebrow">PRIVATE CLOUD SYNC</p><h2 id="authTitle">Sign in to sync</h2></div><button class="close-btn" type="button" data-close="authDialog" aria-label="Close">×</button></div>
-      <p class="form-help" id="authHelp">Use the same account on your phone and laptop. Only your signed-in account can read your records.</p>
+      <p class="form-help" id="authHelp">Sign in with your existing account to open your expense tracker.</p>
       <div class="signed-in-card" id="signedInCard" hidden><span class="cloud-badge">☁</span><div><strong id="signedInEmail"></strong><small>Your records are syncing securely.</small></div></div>
       <div id="authFields">
         <label>Email address<input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required></label>
         <label>Password<input id="authPassword" type="password" minlength="6" autocomplete="current-password" placeholder="Minimum 6 characters" required></label>
         <p class="form-error" id="authError" role="alert"></p>
       </div>
-      <div class="dialog-actions auth-actions" id="signedOutActions"><button class="text-button" id="authSwitchBtn" type="button">Create account</button><button class="primary-btn" type="submit">Sign in</button></div>
+      <div class="dialog-actions auth-actions" id="signedOutActions"><button class="primary-btn" type="submit">Sign in</button></div>
       <div class="settings-actions" id="signedInActions" hidden><button class="secondary-btn" id="syncNowBtn" type="button">Sync now</button><button class="danger-btn" id="signOutBtn" type="button">Sign out</button></div>
     </form>
   </dialog>

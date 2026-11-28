@@ -16,14 +16,14 @@ const PAYMENT_OPTIONS=['UPI','Cash','Credit Card','Debit Card','Net Banking','Ot
 const STORAGE_KEY='kharcha.v1';
 const today=new Date();
 const currentMonthKey=()=>`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-const state=loadState();
+let state={salaries:{},expenses:[]};
 let selectedMonth=currentMonthKey();
 let recognition=null;
 let toastTimer;
 let cloudApi=null;
 let cloudUser=null;
 let applyingCloudData=false;
-let authMode='signin';
+let wasSignedIn=false;
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:Math.abs(n%1)>0?2:0}).format(Number(n)||0);
@@ -31,7 +31,7 @@ const monthLabel=key=>new Date(`${key}-02T00:00:00`).toLocaleDateString('en-IN',
 const escapeHtml=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const isMonthKey=key=>/^\d{4}-(0[1-9]|1[0-2])$/.test(key||'');
 const isIsoDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&!Number.isNaN(new Date(`${value}T12:00:00`).getTime());
-const csvSafe=value=>{const text=String(value??'');return /^[=+\-@\t]/.test(text)?`'${text}`:text;};
+const csvSafe=value=>{const text=String(value??'');return /^[\s\u0000-\u001f]*[=+\-@]/.test(text)?`'${text}`:text;};
 
 function normalizeState(raw){
   const source=raw&&typeof raw==='object'?raw:{};
@@ -66,7 +66,7 @@ function normalizeState(raw){
 function loadState(){
   try{return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'));}catch{return {salaries:{},expenses:[]};}
 }
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!applyingCloudData)cloudApi?.push(state);}
+function saveState(){if(!cloudUser)return;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!applyingCloudData)cloudApi?.push(state);}
 function salaryFor(key){return Number(state.salaries[key]||0);}
 function monthExpenses(key){return state.expenses.filter(e=>e.date.startsWith(key));}
 function totalFor(key){return monthExpenses(key).reduce((sum,e)=>sum+Number(e.amount),0);}
@@ -124,7 +124,7 @@ function renderTransactions(showAll=false){
   allBtn.hidden=showAll||expenses.length<=6;
   if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
-  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><button class="delete-btn" data-delete="${e.id}" aria-label="Delete ${escapeHtml(e.note)}">×</button></div>`}).join('');
+  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><button class="delete-btn" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}">×</button></div>`}).join('');
 }
 
 function openExpense(prefill={}){
@@ -156,22 +156,25 @@ function setSyncStatus(status,message=''){
   if(message&&status==='error')showToast(message);
 }
 function updateAuthUi(user){
-  cloudUser=user;$('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
-  $('authHelp').hidden=!!user;$('authTitle').textContent=user?'Cloud sync is on':'Sign in to sync';$('signedInEmail').textContent=user?.email||'';
+  cloudUser=user;
+  if(user){
+    if(!wasSignedIn){state=loadState();wasSignedIn=true;render();}
+    $('appShell').hidden=false;$('mobileNav').hidden=false;$('accessGate').hidden=true;$('gateError').textContent='';
+  }else{
+    if(wasSignedIn){localStorage.removeItem(STORAGE_KEY);state={salaries:{},expenses:[]};wasSignedIn=false;}
+    $('appShell').hidden=true;$('mobileNav').hidden=true;$('accessGate').hidden=false;
+  }
+  $('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
+  $('authHelp').hidden=!!user;$('authTitle').textContent=user?'Cloud sync is on':'Sign in';$('signedInEmail').textContent=user?.email||'';
   const note=document.querySelector('.privacy-note p');
-  if(note)note.textContent=user?'Your data stays on this device and in your private cloud account.':'Stored on this device. Sign in to sync privately across devices.';
+  if(note)note.textContent='Your records sync with your private account.';
 }
 function openAuthDialog(){
   $('authError').textContent='';updateAuthUi(cloudUser);$('authDialog').showModal();
   if(!cloudUser)setTimeout(()=>$('authEmail').focus(),80);
 }
-function setAuthMode(mode){
-  authMode=mode;const creating=mode==='signup';$('authTitle').textContent=creating?'Create your sync account':'Sign in to sync';
-  $('authSwitchBtn').textContent=creating?'I already have an account':'Create account';$('signedOutActions').querySelector('.primary-btn').textContent=creating?'Create & sync':'Sign in';
-  $('authPassword').autocomplete=creating?'new-password':'current-password';$('authError').textContent='';
-}
 function authErrorMessage(error){
-  const code=error?.code||'';if(code.includes('invalid-credential'))return'Incorrect email or password.';if(code.includes('email-already-in-use'))return'An account already exists for this email.';if(code.includes('weak-password'))return'Use a password with at least 6 characters.';if(code.includes('operation-not-allowed'))return'Email sign-in is still being enabled. Please try again shortly.';return error?.message?.replace(/^Firebase:\s*/,'')||'Could not sign in.';
+  const code=error?.code||'';if(code.includes('invalid-credential'))return'Incorrect email or password.';if(code.includes('operation-not-allowed'))return'Email sign-in is still being enabled. Please try again shortly.';return error?.message?.replace(/^Firebase:\s*/,'')||'Could not sign in.';
 }
 async function initializeCloud(){
   setSyncStatus('syncing');
@@ -179,11 +182,11 @@ async function initializeCloud(){
     const {createCloudSync}=await import('./sync.js');
     cloudApi=await createCloudSync({
       getLocalData:()=>({salaries:state.salaries,expenses:state.expenses}),
-      onData:data=>{const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
+      onData:data=>{if(!cloudUser)return;const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
       onUser:user=>updateAuthUi(user),
       onStatus:setSyncStatus
     });
-  }catch(error){setSyncStatus('error','Cloud sync is temporarily unavailable. Your device copy is safe.');console.error(error);}
+  }catch(error){$('gateError').textContent='Sign-in is unavailable right now. Please try again later.';setSyncStatus('error','Cloud sign-in is temporarily unavailable.');console.error(error);}
 }
 function exportCsv(){
   if(!state.expenses.length){showToast('There are no expenses to export yet.');return;}
@@ -203,13 +206,12 @@ $('allTransactionsBtn').addEventListener('click',()=>{renderTransactions(true);$
 ['exportBtn','settingsExportBtn'].forEach(id=>$(id).addEventListener('click',exportCsv));
 $('settingsBtn').addEventListener('click',()=>$('settingsDialog').showModal());document.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click',()=>{const target=btn.dataset.close; if(target==='settings')$('settingsDialog').close(); else document.getElementById(target)?.close();}));
 $('syncStatusBtn').addEventListener('click',openAuthDialog);
-$('authSwitchBtn').addEventListener('click',()=>setAuthMode(authMode==='signin'?'signup':'signin'));
-$('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi){$('authError').textContent='Cloud sync is unavailable right now. Your device copy remains saved.';return;}$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{if(authMode==='signup')await cloudApi.signUp(email,password);else await cloudApi.signIn(email,password);$('authDialog').close();showToast(authMode==='signup'?'Account created. Your device records are syncing.':'Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
-$('syncNowBtn').addEventListener('click',async()=>{if(!cloudApi||!cloudUser){$('authDialog').close();showToast('Sign in to sync your records.');return;}await cloudApi.syncNow();$('authDialog').close();showToast('Cloud sync refreshed.');});
-$('signOutBtn').addEventListener('click',async()=>{if(!cloudApi){$('authDialog').close();return;}await cloudApi.signOut();$('authDialog').close();showToast('Signed out. Records remain saved on this device.');});
-$('clearDataBtn').addEventListener('click',()=>{const msg=cloudUser?'Clear every salary and expense from this device and your signed-in cloud sync? Export first if you need a backup.':'Clear every salary and expense from this device? Export first if you need a backup.';if(confirm(msg)){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast(cloudUser?'All data cleared from this device and cloud sync.':'All local data cleared.');}});
+$('gateSignInBtn').addEventListener('click',openAuthDialog);
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi){$('authError').textContent='Sign-in is unavailable right now.';return;}$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{await cloudApi.signIn(email,password);$('authPassword').value='';$('authDialog').close();showToast('Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
+$('syncNowBtn').addEventListener('click',async()=>{if(!cloudApi||!cloudUser){$('authDialog').close();showToast('Sign in to sync your records.');return;}const saved=await cloudApi.syncNow();$('authDialog').close();showToast(saved?'Cloud sync refreshed.':'Cloud sync failed. Check your connection.');});
+$('signOutBtn').addEventListener('click',async()=>{if(!cloudApi){$('authDialog').close();return;}try{await cloudApi.signOut();$('authDialog').close();showToast('Signed out. This device copy was removed.');}catch(error){$('authError').textContent=authErrorMessage(error);showToast(authErrorMessage(error));}});
+$('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast('Device data cleared. Cloud sync is pending.');}});
 document.querySelectorAll('.nav-item').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close();}));
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-render();
 initializeCloud();

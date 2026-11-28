@@ -10,7 +10,7 @@ Kharcha is a responsive, privacy-friendly salary and expense tracker built for I
 - Category and payment-mode analytics
 - CSV export
 - Offline-capable progressive web app
-- Browser-local storage with optional private Firebase account sync across devices
+- Private account sync across devices
 
 ## Run locally
 
@@ -20,15 +20,7 @@ Serve the `dist` directory with any static web server, for example:
 npx serve dist
 ```
 
-## Deploy to GitHub Pages
+## Privacy
 
-This project is configured for the `Vinith-Krish/kharcha` repository and will be published at:
-
-**https://vinith-krish.github.io/kharcha/**
-
-The included workflow publishes `dist` whenever changes are pushed to `main`. In the GitHub repository settings, set Pages → Source to **GitHub Actions**.
-
-## Cross-device sync
-
-Create an account from the sync/status button in the app, then sign in with the same email and password on every device. Records are cached locally for offline use and synchronized to the signed-in user's private Firestore document. Firestore security rules restrict each user to their own data. On first sign-in to an existing cloud account, local and cloud records are merged to avoid accidental data loss.
+Expense records require sign-in. Data access is enforced by the database rules, which must be deployed separately from the website.
 

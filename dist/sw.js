@@ -1,4 +1,4 @@
-const CACHE='kharcha-v12';
+const CACHE='kharcha-v13';
 const ASSETS=['./','index.html','styles.css','app.js','sync.js','firebase-config.js','manifest.webmanifest','icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>Promise.all(ASSETS.map(async asset=>{
   const response=await fetch(asset,{cache:'no-store'});

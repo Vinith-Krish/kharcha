@@ -224,7 +224,7 @@ function authErrorMessage(error){
 async function initializeCloud(){
   setSyncStatus('syncing');
   try{
-    const {createCloudSync}=await import('./sync.js');
+    const {createCloudSync}=await import('./sync.js?v=13');
     cloudApi=await createCloudSync({
       getLocalData:()=>({salaries:state.salaries,expenses:state.expenses,additions:state.additions}),
       onData:data=>{if(!cloudUser)return;const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;state.additions=next.additions;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if($('addMoneyDialog').open)renderAddedMoneyHistory();applyingCloudData=false;},
@@ -323,7 +323,7 @@ if('serviceWorker'in navigator){
     if(controlledAtLoad)$('updateBanner').hidden=false;
     controlledAtLoad=true;
   });
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=12',{updateViaCache:'none'}).then(registration=>{
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=13',{updateViaCache:'none'}).then(registration=>{
     registration.update().catch(()=>{});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)registration.update().catch(()=>{});});
   }).catch(()=>{}));

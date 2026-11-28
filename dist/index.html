@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
   <title>Kharcha — Expense Tracker</title>
 </head>
 <body>
@@ -144,7 +144,7 @@
 
   <dialog id="settingsDialog" class="dialog small-dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
-    <p class="form-help">Your signed-in account syncs records across devices. Signing out removes this device's copy. Export a backup before clearing your records.</p>
+    <p class="form-help">Your account stays signed in on this device until you sign out. Signing out removes this device's copy. Export a backup before clearing your records.</p>
     <div class="settings-actions"><button class="secondary-btn" id="settingsExportBtn">Export CSV backup</button><button class="danger-btn" id="clearDataBtn">Clear all data</button></div>
   </dialog>
 
@@ -167,6 +167,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="update-banner" id="updateBanner" role="status" hidden><span>A new version of Kharcha is ready.</span><button id="reloadAppBtn" type="button">Reload app</button></div>
-  <script src="app.js?v=12" defer></script>
+  <script src="app.js?v=13" defer></script>
 </body>
 </html>

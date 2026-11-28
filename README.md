@@ -9,6 +9,7 @@ Kharcha is a responsive, privacy-friendly salary and expense tracker built for I
 - Voice input such as “450 groceries via UPI”
 - Category and payment-mode analytics
 - CSV export
+- Edit saved expenses to correct the amount, details, payment method, or date
 - Offline-capable progressive web app
 - Private account sync across devices
 

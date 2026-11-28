@@ -8,3 +8,11 @@
 .access-card{width:min(420px,100%);padding:32px;border:1px solid var(--line);border-radius:20px;background:white;box-shadow:var(--shadow)}
 .access-card h1{font:800 1.7rem Manrope;margin:20px 0 8px}
 .access-card p{color:var(--muted);line-height:1.5}
+.transaction-row{grid-template-columns:44px minmax(0,1fr) auto auto}
+.transaction-main{min-width:0;overflow-wrap:anywhere}
+.transaction-actions{display:flex;align-items:center;gap:4px}
+.edit-btn{border:0;background:#eef4ef;color:var(--green);border-radius:8px;padding:7px 8px;font-size:.75rem;font-weight:700;cursor:pointer}
+.edit-btn:hover,.edit-btn:focus-visible{background:var(--mint)}
+.delete-btn{width:30px;height:30px;border-radius:8px}
+.delete-btn:hover,.delete-btn:focus-visible{background:#fff0ef;color:var(--red)}
+@media(max-width:620px){.transaction-row{grid-template-columns:38px minmax(0,1fr) auto auto;gap:7px}.transaction-amount strong{font-size:.78rem}.edit-btn{padding:7px 5px}}

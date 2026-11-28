@@ -24,6 +24,8 @@ let cloudApi=null;
 let cloudUser=null;
 let applyingCloudData=false;
 let wasSignedIn=false;
+let editingExpenseId=null;
+let showAllTransactions=false;
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:Math.abs(n%1)>0?2:0}).format(Number(n)||0);
@@ -117,17 +119,21 @@ function renderPayments(total){
   $('upiInsight').textContent=total?`${Math.round(upi/total*100)}% of this month’s expenses were paid by UPI.`:'Add expenses to see your payment habits.';
 }
 
-function renderTransactions(showAll=false){
+function renderTransactions(showAll=showAllTransactions){
   const expenses=monthExpenses(selectedMonth).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
   const shown=showAll?expenses:expenses.slice(0,6);
   const allBtn=$('allTransactionsBtn');
   allBtn.hidden=showAll||expenses.length<=6;
   if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
-  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><button class="delete-btn" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}">×</button></div>`}).join('');
+  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><div class="transaction-actions"><button class="edit-btn" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}" title="Edit expense">Edit</button><button class="delete-btn" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div></div>`}).join('');
 }
 
 function openExpense(prefill={}){
+  editingExpenseId=prefill.id||null;
+  $('expenseDialogEyebrow').textContent=editingExpenseId?'EDIT ENTRY':'NEW ENTRY';
+  $('expenseDialogTitle').textContent=editingExpenseId?'Edit expense':'Add an expense';
+  $('expenseSubmitBtn').textContent=editingExpenseId?'Save changes':'Save expense';
   $('expenseForm').reset();$('expenseDate').value=prefill.date||new Date().toISOString().slice(0,10);$('expenseAmount').value=prefill.amount||'';$('expenseNote').value=prefill.note||'';$('expenseCategory').value=prefill.category||'Food & Groceries';$('expensePayment').value=prefill.payment||'UPI';
   const box=$('voiceTranscript');box.hidden=!prefill.transcript;box.querySelector('p').textContent=prefill.transcript||'';$('expenseDialog').showModal();setTimeout(()=>$(prefill.amount?'expenseNote':'expenseAmount').focus(),80);
 }
@@ -195,14 +201,35 @@ function exportCsv(){
 }
 
 $('expenseCategory').innerHTML=CATEGORIES.map(c=>`<option>${c.name}</option>`).join('');$('monthPicker').value=selectedMonth;
-$('monthPicker').addEventListener('change',e=>{selectedMonth=e.target.value||currentMonthKey();render();});
+$('monthPicker').addEventListener('change',e=>{selectedMonth=e.target.value||currentMonthKey();showAllTransactions=false;render();});
 ['addExpenseBtn','mobileAddBtn'].forEach(id=>$(id).addEventListener('click',()=>openExpense()));
 ['voiceBtn','mobileVoiceBtn'].forEach(id=>$(id).addEventListener('click',startVoice));
 $('salaryBtn').addEventListener('click',()=>{$('salaryInput').value=salaryFor(selectedMonth)||'';$('salaryDialog').showModal();setTimeout(()=>$('salaryInput').focus(),80);});
 $('salaryForm').addEventListener('submit',e=>{e.preventDefault();state.salaries[selectedMonth]=Math.max(0,Number($('salaryInput').value)||0);saveState();$('salaryDialog').close();showToast(`Salary saved for ${monthLabel(selectedMonth)}.`);});
-$('expenseForm').addEventListener('submit',e=>{e.preventDefault();const amount=Number($('expenseAmount').value);if(!amount||amount<=0)return;state.expenses.push({id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,amount,note:$('expenseNote').value.trim(),category:$('expenseCategory').value,payment:$('expensePayment').value,date:$('expenseDate').value,createdAt:Date.now()});saveState();$('expenseDialog').close();showToast('Expense added.');});
-$('transactionList').addEventListener('click',e=>{const id=e.target.dataset.delete;if(!id)return;if(confirm('Delete this expense?')){state.expenses=state.expenses.filter(x=>x.id!==id);saveState();showToast('Expense deleted.');}});
-$('allTransactionsBtn').addEventListener('click',()=>{renderTransactions(true);$('allTransactionsBtn').hidden=true;});
+$('expenseForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const amount=Number($('expenseAmount').value),note=$('expenseNote').value.trim();
+  if(!Number.isFinite(amount)||amount<=0||!note)return;
+  const details={amount:Math.round(amount*100)/100,note,category:$('expenseCategory').value,payment:$('expensePayment').value,date:$('expenseDate').value};
+  if(editingExpenseId){
+    const expense=state.expenses.find(item=>item.id===editingExpenseId);
+    if(!expense){$('expenseDialog').close();showToast('This expense is no longer available.');return;}
+    Object.assign(expense,details);
+  }else{
+    state.expenses.push({id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,createdAt:Date.now(),...details});
+  }
+  const wasEditing=!!editingExpenseId;
+  saveState();$('expenseDialog').close();showToast(wasEditing?'Expense updated.':'Expense added.');
+});
+$('transactionList').addEventListener('click',e=>{
+  const editButton=e.target.closest('[data-edit]');
+  if(editButton){const expense=state.expenses.find(item=>item.id===editButton.dataset.edit);if(expense)openExpense(expense);return;}
+  const deleteButton=e.target.closest('[data-delete]');
+  if(!deleteButton)return;
+  const id=deleteButton.dataset.delete;
+  if(confirm('Delete this expense?')){state.expenses=state.expenses.filter(x=>x.id!==id);saveState();showToast('Expense deleted.');}
+});
+$('allTransactionsBtn').addEventListener('click',()=>{showAllTransactions=true;renderTransactions();});
 ['exportBtn','settingsExportBtn'].forEach(id=>$(id).addEventListener('click',exportCsv));
 $('settingsBtn').addEventListener('click',()=>$('settingsDialog').showModal());document.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click',()=>{const target=btn.dataset.close; if(target==='settings')$('settingsDialog').close(); else document.getElementById(target)?.close();}));
 $('syncStatusBtn').addEventListener('click',openAuthDialog);

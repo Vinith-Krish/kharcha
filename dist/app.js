@@ -143,7 +143,7 @@ function renderTransactions(showAll=showAllTransactions){
   allBtn.hidden=showAll||expenses.length<=6;
   if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
-  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><div class="transaction-actions"><button class="edit-btn" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}" title="Edit expense">Edit</button><button class="delete-btn" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div></div>`}).join('');
+  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><button class="transaction-open" type="button" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}"><span class="transaction-icon">${cat.icon}</span><span class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></span><span class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></span></button><button class="delete-btn" type="button" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div>`}).join('');
 }
 
 function renderAddedMoneyHistory(){
@@ -311,7 +311,7 @@ if('serviceWorker'in navigator){
     if(controlledAtLoad)$('updateBanner').hidden=false;
     controlledAtLoad=true;
   });
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=10',{updateViaCache:'none'}).then(registration=>{
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=11',{updateViaCache:'none'}).then(registration=>{
     registration.update().catch(()=>{});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)registration.update().catch(()=>{});});
   }).catch(()=>{}));

@@ -26,9 +26,13 @@ let applyingCloudData=false;
 let wasSignedIn=false;
 let editingExpenseId=null;
 let showAllTransactions=false;
+let showBalance=false;
+let showIncome=false;
 
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:Math.abs(n%1)>0?2:0}).format(Number(n)||0);
+const balanceMoney=n=>showBalance?money(n):'••••';
+const incomeMoney=n=>showIncome?money(n):'••••';
 const monthLabel=key=>new Date(`${key}-02T00:00:00`).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
 const escapeHtml=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const isMonthKey=key=>/^\d{4}-(0[1-9]|1[0-2])$/.test(key||'');
@@ -99,16 +103,21 @@ function totals(){const salary=salaryFor(selectedMonth),added=addedTotalFor(sele
 
 function render(){
   const t=totals();
-  $('availableBalance').textContent=money(t.available);
-  $('salaryValue').textContent=money(t.salary);
-  $('addedMoneyValue').textContent=money(t.added);
-  $('carryValue').textContent=money(t.carry);
-  $('spentLabel').textContent=`${money(t.spent)} spent`;
-  $('remainingLabel').textContent=`${money(Math.max(0,t.available))} left`;
+  $('availableBalance').textContent=balanceMoney(t.available);
+  $('salaryValue').textContent=incomeMoney(t.salary);
+  $('addedMoneyValue').textContent=incomeMoney(t.added);
+  $('carryValue').textContent=incomeMoney(t.carry);
+  $('spentLabel').textContent=`${balanceMoney(t.spent)} spent`;
+  $('remainingLabel').textContent=`${balanceMoney(Math.max(0,t.available))} left`;
+  [['balanceVisibilityBtn',showBalance,'balance and spending amounts'],['salaryVisibilityBtn',showIncome,'salary and income amounts']].forEach(([id,visible,label])=>{
+    const button=$(id);button.setAttribute('aria-pressed',String(visible));button.setAttribute('aria-label',`${visible?'Hide':'Show'} ${label}`);button.title=`${visible?'Hide':'Show'} ${label}`;
+  });
   const used=t.budget?Math.min(100,(t.spent/t.budget)*100):0;
-  $('budgetProgress').style.width=`${used}%`;
+  $('budgetProgress').style.width=showBalance?`${used}%`:'0%';
+  $('budgetProgress').parentElement.setAttribute('aria-label',showBalance?'Monthly budget used':'Monthly budget hidden');
   const status=$('balanceStatus');status.className='status-pill';
-  if(!t.budget){status.textContent='Start here';$('balanceContext').textContent=`Set your salary or add money for ${monthLabel(selectedMonth)} to begin.`;}
+  if(!showBalance){status.textContent='Hidden';$('balanceContext').textContent='Tap the eye to show your balance.';}
+  else if(!t.budget){status.textContent='Start here';$('balanceContext').textContent=`Set your salary or add money for ${monthLabel(selectedMonth)} to begin.`;}
   else if(t.available<0){status.textContent='Over budget';status.classList.add('danger');$('balanceContext').textContent=`You have exceeded this month’s available amount by ${money(Math.abs(t.available))}.`;}
   else if(used>75){status.textContent='Watch spending';status.classList.add('warning');$('balanceContext').textContent=`${Math.round(used)}% of your available money has been used.`;}
   else{status.textContent='On track';$('balanceContext').textContent=`You have used ${Math.round(used)}% of ${money(t.budget)} available in ${monthLabel(selectedMonth)}.`;}
@@ -118,12 +127,12 @@ function render(){
 function renderCategories(total){
   const grouped={};monthExpenses(selectedMonth).forEach(e=>grouped[e.category]=(grouped[e.category]||0)+Number(e.amount));
   const items=Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
-  $('categoryCount').textContent=`${items.length} categor${items.length===1?'y':'ies'}`;$('donutTotal').textContent=money(total);
+  $('categoryCount').textContent=`${items.length} categor${items.length===1?'y':'ies'}`;$('donutTotal').textContent=balanceMoney(total);
   if(!items.length){$('categoryDonut').style.background='conic-gradient(#dfe6e1 0 100%)';$('categoryLegend').innerHTML='<p class="empty-mini">Your category mix will appear here.</p>';return;}
   let at=0;const stops=[];
   items.forEach(([name,value])=>{const cat=CATEGORIES.find(c=>c.name===name)||CATEGORIES.at(-1);const end=at+(value/total*100);stops.push(`${cat.color} ${at}% ${end}%`);at=end;});
   $('categoryDonut').style.background=`conic-gradient(${stops.join(',')})`;
-  $('categoryLegend').innerHTML=items.slice(0,5).map(([name,value])=>{const cat=CATEGORIES.find(c=>c.name===name)||CATEGORIES.at(-1);return `<div class="legend-row"><i style="background:${cat.color}"></i><span>${escapeHtml(name)}<small>${Math.round(value/total*100)}% of spending</small></span><strong>${money(value)}</strong></div>`}).join('');
+  $('categoryLegend').innerHTML=items.slice(0,5).map(([name,value])=>{const cat=CATEGORIES.find(c=>c.name===name)||CATEGORIES.at(-1);return `<div class="legend-row"><i style="background:${cat.color}"></i><span>${escapeHtml(name)}<small>${Math.round(value/total*100)}% of spending</small></span><strong>${balanceMoney(value)}</strong></div>`}).join('');
 }
 
 function renderPayments(total){
@@ -143,12 +152,12 @@ function renderTransactions(showAll=showAllTransactions){
   allBtn.hidden=showAll||expenses.length<=6;
   if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
-  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><button class="transaction-open" type="button" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}"><span class="transaction-icon">${cat.icon}</span><span class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></span><span class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></span></button><button class="delete-btn" type="button" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div>`}).join('');
+  $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><button class="transaction-open" type="button" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}"><span class="transaction-icon">${cat.icon}</span><span class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></span><span class="transaction-amount"><strong>${showBalance?'− '+money(e.amount):'••••'}</strong><small>${escapeHtml(e.payment)}</small></span></button><button class="delete-btn" type="button" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div>`}).join('');
 }
 
 function renderAddedMoneyHistory(){
   const entries=additionsFor(selectedMonth).sort((a,b)=>b.createdAt-a.createdAt);
-  $('addedMoneyHistory').innerHTML=entries.length?`<h3>Added this month</h3>${entries.map(item=>`<div class="added-money-row"><span>${escapeHtml(item.note)}</span><strong>+ ${money(item.amount)}</strong><button type="button" data-delete-addition="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.note)}">×</button></div>`).join('')}`:'<p class="form-help">No money added for this month yet.</p>';
+  $('addedMoneyHistory').innerHTML=entries.length?`<h3>Added this month</h3>${entries.map(item=>`<div class="added-money-row"><span>${escapeHtml(item.note)}</span><strong>${showIncome?'+ '+money(item.amount):'••••'}</strong><button type="button" data-delete-addition="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.note)}">×</button></div>`).join('')}`:'<p class="form-help">No money added for this month yet.</p>';
 }
 
 function openAddMoney(){
@@ -197,7 +206,7 @@ function updateAuthUi(user){
     if(!wasSignedIn){state=loadState();wasSignedIn=true;render();}
     $('appShell').hidden=false;$('mobileNav').hidden=false;$('accessGate').hidden=true;$('gateError').textContent='';
   }else{
-    if(wasSignedIn){localStorage.removeItem(STORAGE_KEY);state={salaries:{},expenses:[],additions:[]};wasSignedIn=false;}
+    if(wasSignedIn){localStorage.removeItem(STORAGE_KEY);state={salaries:{},expenses:[],additions:[]};wasSignedIn=false;showBalance=false;showIncome=false;}
     $('appShell').hidden=true;$('mobileNav').hidden=true;$('accessGate').hidden=false;
   }
   $('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
@@ -236,6 +245,9 @@ function exportCsv(){
 }
 
 $('expenseCategory').innerHTML=CATEGORIES.map(c=>`<option>${c.name}</option>`).join('');$('monthPicker').value=selectedMonth;
+$('balanceVisibilityBtn').addEventListener('click',()=>{showBalance=!showBalance;render();});
+$('salaryVisibilityBtn').addEventListener('click',()=>{showIncome=!showIncome;render();if($('addMoneyDialog').open)renderAddedMoneyHistory();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&(showBalance||showIncome)){showBalance=false;showIncome=false;render();if($('addMoneyDialog').open)renderAddedMoneyHistory();}});
 $('monthPicker').addEventListener('change',e=>{selectedMonth=e.target.value||currentMonthKey();showAllTransactions=false;render();});
 ['addExpenseBtn','mobileAddBtn'].forEach(id=>$(id).addEventListener('click',()=>openExpense()));
 ['voiceBtn','mobileVoiceBtn'].forEach(id=>$(id).addEventListener('click',startVoice));
@@ -311,7 +323,7 @@ if('serviceWorker'in navigator){
     if(controlledAtLoad)$('updateBanner').hidden=false;
     controlledAtLoad=true;
   });
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=11',{updateViaCache:'none'}).then(registration=>{
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=12',{updateViaCache:'none'}).then(registration=>{
     registration.update().catch(()=>{});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)registration.update().catch(()=>{});});
   }).catch(()=>{}));

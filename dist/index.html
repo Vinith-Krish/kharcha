@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
   <title>Kharcha — Expense Tracker</title>
 </head>
 <body>
@@ -56,15 +56,15 @@
       <section id="dashboard" class="balance-card" aria-labelledby="balanceTitle">
         <div class="balance-copy">
           <p class="card-label" id="balanceTitle">AVAILABLE THIS MONTH</p>
-          <div class="balance-row"><h2 id="availableBalance">₹0</h2><span class="status-pill" id="balanceStatus">On track</span></div>
-          <p class="balance-context" id="balanceContext">Add your salary to begin tracking.</p>
+          <div class="balance-row"><div class="balance-value"><h2 id="availableBalance">••••</h2><button class="visibility-btn" id="balanceVisibilityBtn" type="button" aria-label="Show balance and spending amounts" aria-pressed="false" title="Show balance and spending amounts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="M3 21 21 3"/></svg></button></div><span class="status-pill" id="balanceStatus">Hidden</span></div>
+          <p class="balance-context" id="balanceContext">Tap the eye to show your balance.</p>
           <div class="progress-track" aria-label="Monthly budget used"><span id="budgetProgress"></span></div>
-          <div class="budget-legend"><span><i class="dot spent"></i><b id="spentLabel">₹0 spent</b></span><span><i class="dot safe"></i><b id="remainingLabel">₹0 left</b></span></div>
+          <div class="budget-legend"><span><i class="dot spent"></i><b id="spentLabel">•••• spent</b></span><span><i class="dot safe"></i><b id="remainingLabel">•••• left</b></span></div>
         </div>
         <div class="income-panel">
-          <div><span>Monthly salary</span><strong id="salaryValue">₹0</strong></div>
-          <div><span>Money added</span><strong id="addedMoneyValue">₹0</strong></div>
-          <div><span>Carried forward</span><strong id="carryValue">₹0</strong></div>
+          <div><span>Monthly salary</span><span class="salary-control"><strong id="salaryValue">••••</strong><button class="visibility-btn" id="salaryVisibilityBtn" type="button" aria-label="Show salary and income amounts" aria-pressed="false" title="Show salary and income amounts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="M3 21 21 3"/></svg></button></span></div>
+          <div><span>Money added</span><strong id="addedMoneyValue">••••</strong></div>
+          <div><span>Carried forward</span><strong id="carryValue">••••</strong></div>
           <div class="income-actions"><button class="secondary-btn" id="salaryBtn">Set salary</button><button class="secondary-btn" id="addMoneyBtn">+ Add money</button></div>
         </div>
       </section>
@@ -167,6 +167,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="update-banner" id="updateBanner" role="status" hidden><span>A new version of Kharcha is ready.</span><button id="reloadAppBtn" type="button">Reload app</button></div>
-  <script src="app.js?v=11" defer></script>
+  <script src="app.js?v=12" defer></script>
 </body>
 </html>

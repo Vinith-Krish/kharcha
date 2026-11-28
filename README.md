@@ -6,6 +6,7 @@ Kharcha is a responsive, privacy-friendly salary and expense tracker built for I
 
 - Monthly salary and automatic balance carry-forward
 - Add money from bonuses, refunds, or gifts separately from salary
+- Eye controls hide balance and income amounts by default, including when returning to the app
 - Indian rupee formatting and India-focused categories
 - Voice input such as “450 groceries via UPI”
 - Category and payment-mode analytics

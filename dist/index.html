@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=10">
   <title>Kharcha — Expense Tracker</title>
 </head>
 <body>
@@ -63,8 +63,9 @@
         </div>
         <div class="income-panel">
           <div><span>Monthly salary</span><strong id="salaryValue">₹0</strong></div>
+          <div><span>Money added</span><strong id="addedMoneyValue">₹0</strong></div>
           <div><span>Carried forward</span><strong id="carryValue">₹0</strong></div>
-          <button class="secondary-btn" id="salaryBtn">Set salary</button>
+          <div class="income-actions"><button class="secondary-btn" id="salaryBtn">Set salary</button><button class="secondary-btn" id="addMoneyBtn">+ Add money</button></div>
         </div>
       </section>
 
@@ -130,6 +131,17 @@
     </form>
   </dialog>
 
+  <dialog id="addMoneyDialog" class="dialog small-dialog">
+    <form method="dialog" id="addMoneyForm">
+      <div class="dialog-head"><div><p class="eyebrow">EXTRA INCOME</p><h2>Add money</h2></div><button class="close-btn" type="button" data-close="addMoneyDialog" aria-label="Close">×</button></div>
+      <p class="form-help" id="addMoneyMonth"></p>
+      <label>Amount (₹)<input id="addMoneyAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 2000" required></label>
+      <label>Where did it come from?<input id="addMoneyNote" type="text" maxlength="60" placeholder="e.g. Bonus or refund" required></label>
+      <div class="dialog-actions"><button class="secondary-btn" type="button" data-close="addMoneyDialog">Cancel</button><button class="primary-btn" type="submit">Add money</button></div>
+      <div class="added-money-history" id="addedMoneyHistory"></div>
+    </form>
+  </dialog>
+
   <dialog id="settingsDialog" class="dialog small-dialog">
     <div class="dialog-head"><div><p class="eyebrow">YOUR DATA</p><h2>Data settings</h2></div><button class="close-btn" data-close="settings" aria-label="Close">×</button></div>
     <p class="form-help">Your signed-in account syncs records across devices. Signing out removes this device's copy. Export a backup before clearing your records.</p>
@@ -154,6 +166,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js" defer></script>
+  <div class="update-banner" id="updateBanner" role="status" hidden><span>A new version of Kharcha is ready.</span><button id="reloadAppBtn" type="button">Reload app</button></div>
+  <script src="app.js?v=10" defer></script>
 </body>
 </html>

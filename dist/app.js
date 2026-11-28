@@ -16,7 +16,7 @@ const PAYMENT_OPTIONS=['UPI','Cash','Credit Card','Debit Card','Net Banking','Ot
 const STORAGE_KEY='kharcha.v1';
 const today=new Date();
 const currentMonthKey=()=>`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-let state={salaries:{},expenses:[]};
+let state={salaries:{},expenses:[],additions:[]};
 let selectedMonth=currentMonthKey();
 let recognition=null;
 let toastTimer;
@@ -62,36 +62,53 @@ function normalizeState(raw){
       expenses.push({id,amount:Math.round(amount*100)/100,note,category,payment,date,createdAt});
     });
   }
-  return {salaries,expenses};
+  const additions=[];
+  const seenAdditions=new Set();
+  if(Array.isArray(source.additions)){
+    source.additions.forEach(item=>{
+      if(!item||typeof item!=='object'||!isMonthKey(item.month))return;
+      const amount=Number(item.amount);
+      if(!Number.isFinite(amount)||amount<=0)return;
+      const id=typeof item.id==='string'&&item.id.trim()?item.id.trim():(crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`);
+      if(seenAdditions.has(id))return;seenAdditions.add(id);
+      const note=String(item.note||'Added money').trim().slice(0,60)||'Added money';
+      const createdAt=Number.isFinite(Number(item.createdAt))?Number(item.createdAt):Date.now();
+      additions.push({id,month:item.month,amount:Math.round(amount*100)/100,note,createdAt});
+    });
+  }
+  return {salaries,expenses,additions};
 }
 
 function loadState(){
-  try{return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'));}catch{return {salaries:{},expenses:[]};}
+  try{return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'));}catch{return {salaries:{},expenses:[],additions:[]};}
 }
 function saveState(){if(!cloudUser)return;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!applyingCloudData)cloudApi?.push(state);}
 function salaryFor(key){return Number(state.salaries[key]||0);}
+function additionsFor(key){return state.additions.filter(item=>item.month===key);}
+function addedTotalFor(key){return additionsFor(key).reduce((sum,item)=>sum+item.amount,0);}
 function monthExpenses(key){return state.expenses.filter(e=>e.date.startsWith(key));}
 function totalFor(key){return monthExpenses(key).reduce((sum,e)=>sum+Number(e.amount),0);}
 function previousMonth(key){const [y,m]=key.split('-').map(Number);const d=new Date(y,m-2,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function carryFor(key,depth=0){
   if(depth>120)return 0;
-  const prev=previousMonth(key);const hasPrev=Object.prototype.hasOwnProperty.call(state.salaries,prev)||monthExpenses(prev).length>0;
+  const prev=previousMonth(key);const hasPrev=Object.prototype.hasOwnProperty.call(state.salaries,prev)||monthExpenses(prev).length>0||additionsFor(prev).length>0;
   if(!hasPrev)return 0;
-  return Math.max(0,salaryFor(prev)+carryFor(prev,depth+1)-totalFor(prev));
+  return Math.max(0,salaryFor(prev)+addedTotalFor(prev)+carryFor(prev,depth+1)-totalFor(prev));
 }
-function totals(){const salary=salaryFor(selectedMonth),carry=carryFor(selectedMonth),spent=totalFor(selectedMonth);return {salary,carry,spent,budget:salary+carry,available:salary+carry-spent};}
+function totals(){const salary=salaryFor(selectedMonth),added=addedTotalFor(selectedMonth),carry=carryFor(selectedMonth),spent=totalFor(selectedMonth);return {salary,added,carry,spent,budget:salary+added+carry,available:salary+added+carry-spent};}
 
 function render(){
   const t=totals();
   $('availableBalance').textContent=money(t.available);
   $('salaryValue').textContent=money(t.salary);
+  $('addedMoneyValue').textContent=money(t.added);
   $('carryValue').textContent=money(t.carry);
   $('spentLabel').textContent=`${money(t.spent)} spent`;
   $('remainingLabel').textContent=`${money(Math.max(0,t.available))} left`;
   const used=t.budget?Math.min(100,(t.spent/t.budget)*100):0;
   $('budgetProgress').style.width=`${used}%`;
   const status=$('balanceStatus');status.className='status-pill';
-  if(!t.budget){status.textContent='Start here';$('balanceContext').textContent=`Set your salary for ${monthLabel(selectedMonth)} to begin.`;}
+  if(!t.budget){status.textContent='Start here';$('balanceContext').textContent=`Set your salary or add money for ${monthLabel(selectedMonth)} to begin.`;}
   else if(t.available<0){status.textContent='Over budget';status.classList.add('danger');$('balanceContext').textContent=`You have exceeded this month’s available amount by ${money(Math.abs(t.available))}.`;}
   else if(used>75){status.textContent='Watch spending';status.classList.add('warning');$('balanceContext').textContent=`${Math.round(used)}% of your available money has been used.`;}
   else{status.textContent='On track';$('balanceContext').textContent=`You have used ${Math.round(used)}% of ${money(t.budget)} available in ${monthLabel(selectedMonth)}.`;}
@@ -127,6 +144,19 @@ function renderTransactions(showAll=showAllTransactions){
   if(showAll||expenses.length<=6)allBtn.textContent='View all'; else allBtn.textContent=`View all (${expenses.length})`;
   if(!shown.length){$('transactionList').innerHTML='<div class="empty-state"><span>🧾</span><strong>No expenses yet</strong><p>Add your first expense manually or by voice.</p></div>';return;}
   $('transactionList').innerHTML=shown.map(e=>{const cat=CATEGORIES.find(c=>c.name===e.category)||CATEGORIES.at(-1);const date=new Date(`${e.date}T12:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short'});return `<div class="transaction-row"><span class="transaction-icon">${cat.icon}</span><div class="transaction-main"><strong>${escapeHtml(e.note)}</strong><small>${escapeHtml(e.category)} · ${date}</small></div><div class="transaction-amount"><strong>− ${money(e.amount)}</strong><small>${escapeHtml(e.payment)}</small></div><div class="transaction-actions"><button class="edit-btn" data-edit="${escapeHtml(e.id)}" aria-label="Edit ${escapeHtml(e.note)}" title="Edit expense">Edit</button><button class="delete-btn" data-delete="${escapeHtml(e.id)}" aria-label="Delete ${escapeHtml(e.note)}" title="Delete expense">×</button></div></div>`}).join('');
+}
+
+function renderAddedMoneyHistory(){
+  const entries=additionsFor(selectedMonth).sort((a,b)=>b.createdAt-a.createdAt);
+  $('addedMoneyHistory').innerHTML=entries.length?`<h3>Added this month</h3>${entries.map(item=>`<div class="added-money-row"><span>${escapeHtml(item.note)}</span><strong>+ ${money(item.amount)}</strong><button type="button" data-delete-addition="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.note)}">×</button></div>`).join('')}`:'<p class="form-help">No money added for this month yet.</p>';
+}
+
+function openAddMoney(){
+  $('addMoneyForm').reset();
+  $('addMoneyMonth').textContent=`Added money increases your available balance for ${monthLabel(selectedMonth)}. Any amount left carries forward.`;
+  renderAddedMoneyHistory();
+  $('addMoneyDialog').showModal();
+  setTimeout(()=>$('addMoneyAmount').focus(),80);
 }
 
 function openExpense(prefill={}){
@@ -167,7 +197,7 @@ function updateAuthUi(user){
     if(!wasSignedIn){state=loadState();wasSignedIn=true;render();}
     $('appShell').hidden=false;$('mobileNav').hidden=false;$('accessGate').hidden=true;$('gateError').textContent='';
   }else{
-    if(wasSignedIn){localStorage.removeItem(STORAGE_KEY);state={salaries:{},expenses:[]};wasSignedIn=false;}
+    if(wasSignedIn){localStorage.removeItem(STORAGE_KEY);state={salaries:{},expenses:[],additions:[]};wasSignedIn=false;}
     $('appShell').hidden=true;$('mobileNav').hidden=true;$('accessGate').hidden=false;
   }
   $('signedInCard').hidden=!user;$('signedInActions').hidden=!user;$('authFields').hidden=!!user;$('signedOutActions').hidden=!!user;
@@ -187,17 +217,22 @@ async function initializeCloud(){
   try{
     const {createCloudSync}=await import('./sync.js');
     cloudApi=await createCloudSync({
-      getLocalData:()=>({salaries:state.salaries,expenses:state.expenses}),
-      onData:data=>{if(!cloudUser)return;const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();applyingCloudData=false;},
+      getLocalData:()=>({salaries:state.salaries,expenses:state.expenses,additions:state.additions}),
+      onData:data=>{if(!cloudUser)return;const next=normalizeState(data);applyingCloudData=true;state.salaries=next.salaries;state.expenses=next.expenses;state.additions=next.additions;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if($('addMoneyDialog').open)renderAddedMoneyHistory();applyingCloudData=false;},
       onUser:user=>updateAuthUi(user),
       onStatus:setSyncStatus
     });
   }catch(error){$('gateError').textContent='Sign-in is unavailable right now. Please try again later.';setSyncStatus('error','Cloud sign-in is temporarily unavailable.');console.error(error);}
 }
 function exportCsv(){
-  if(!state.expenses.length){showToast('There are no expenses to export yet.');return;}
-  const rows=[['Date','Description','Category','Payment mode','Amount (INR)'],...state.expenses.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.note,e.category,e.payment,e.amount])];
-  const csv=rows.map(r=>r.map(v=>`"${csvSafe(v).replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob([`\uFEFF${csv}`],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kharcha-expenses-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);showToast('CSV exported.');
+  if(!state.expenses.length&&!state.additions.length&&!Object.keys(state.salaries).length){showToast('There are no records to export yet.');return;}
+  const entries=[
+    ...Object.entries(state.salaries).map(([month,amount])=>[`${month}-01`,'Monthly salary','Salary','',amount]),
+    ...state.additions.map(item=>[`${item.month}-01`,item.note,'Added money','',item.amount]),
+    ...state.expenses.map(e=>[e.date,e.note,e.category,e.payment,e.amount])
+  ].sort((a,b)=>a[0].localeCompare(b[0]));
+  const rows=[['Date','Description','Category','Payment mode','Amount (INR)'],...entries];
+  const csv=rows.map(r=>r.map(v=>`"${csvSafe(v).replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob([`\uFEFF${csv}`],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`kharcha-records-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);showToast('CSV exported.');
 }
 
 $('expenseCategory').innerHTML=CATEGORIES.map(c=>`<option>${c.name}</option>`).join('');$('monthPicker').value=selectedMonth;
@@ -206,6 +241,20 @@ $('monthPicker').addEventListener('change',e=>{selectedMonth=e.target.value||cur
 ['voiceBtn','mobileVoiceBtn'].forEach(id=>$(id).addEventListener('click',startVoice));
 $('salaryBtn').addEventListener('click',()=>{$('salaryInput').value=salaryFor(selectedMonth)||'';$('salaryDialog').showModal();setTimeout(()=>$('salaryInput').focus(),80);});
 $('salaryForm').addEventListener('submit',e=>{e.preventDefault();state.salaries[selectedMonth]=Math.max(0,Number($('salaryInput').value)||0);saveState();$('salaryDialog').close();showToast(`Salary saved for ${monthLabel(selectedMonth)}.`);});
+$('addMoneyBtn').addEventListener('click',openAddMoney);
+$('addMoneyForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const amount=Number($('addMoneyAmount').value),note=$('addMoneyNote').value.trim();
+  if(!Number.isFinite(amount)||amount<=0||!note)return;
+  state.additions.push({id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,month:selectedMonth,amount:Math.round(amount*100)/100,note,createdAt:Date.now()});
+  saveState();$('addMoneyDialog').close();showToast('Money added.');
+});
+$('addedMoneyHistory').addEventListener('click',e=>{
+  const button=e.target.closest('[data-delete-addition]');
+  if(!button||!confirm('Remove this added money?'))return;
+  state.additions=state.additions.filter(item=>item.id!==button.dataset.deleteAddition);
+  saveState();renderAddedMoneyHistory();showToast('Added money removed.');
+});
 $('expenseForm').addEventListener('submit',e=>{
   e.preventDefault();
   const amount=Number($('expenseAmount').value),note=$('expenseNote').value.trim();
@@ -253,8 +302,19 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
 });
 $('syncNowBtn').addEventListener('click',async()=>{if(!cloudApi||!cloudUser){$('authDialog').close();showToast('Sign in to sync your records.');return;}const saved=await cloudApi.syncNow();$('authDialog').close();showToast(saved?'Cloud sync refreshed.':'Cloud sync failed. Check your connection.');});
 $('signOutBtn').addEventListener('click',async()=>{if(!cloudApi){$('authDialog').close();return;}try{await cloudApi.signOut();$('authDialog').close();showToast('Signed out. This device copy was removed.');}catch(error){$('authError').textContent=authErrorMessage(error);showToast(authErrorMessage(error));}});
-$('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast('Device data cleared. Cloud sync is pending.');}});
+$('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary, added money entry, and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];state.additions=[];saveState();$('settingsDialog').close();showToast('Device data cleared. Cloud sync is pending.');}});
 document.querySelectorAll('.nav-item').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close();}));
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker'in navigator){
+  let controlledAtLoad=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(controlledAtLoad)$('updateBanner').hidden=false;
+    controlledAtLoad=true;
+  });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js?v=10',{updateViaCache:'none'}).then(registration=>{
+    registration.update().catch(()=>{});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)registration.update().catch(()=>{});});
+  }).catch(()=>{}));
+}
+$('reloadAppBtn').addEventListener('click',()=>location.reload());
 initializeCloud();

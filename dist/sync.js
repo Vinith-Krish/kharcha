@@ -24,7 +24,7 @@ export async function createCloudSync(callbacks) {
     const write = async () => {
       callbacks.onStatus('syncing');
       try {
-        await setDoc(ledgerRef(currentUser), { salaries:data.salaries || {}, expenses:data.expenses || [], updatedAt:serverTimestamp() });
+        await setDoc(ledgerRef(currentUser), { salaries:data.salaries || {}, expenses:data.expenses || [], additions:data.additions || [], updatedAt:serverTimestamp() });
         callbacks.onStatus('synced');
         return true;
       } catch (error) {
@@ -102,7 +102,8 @@ function normalizeSyncData(data) {
   const source = data && typeof data === 'object' ? data : {};
   const salaries = source.salaries && typeof source.salaries === 'object' ? source.salaries : {};
   const expenses = Array.isArray(source.expenses) ? source.expenses : [];
-  return { salaries, expenses };
+  const additions = Array.isArray(source.additions) ? source.additions : [];
+  return { salaries, expenses, additions };
 }
 
 function mergeLedgers(local, remote) {
@@ -117,7 +118,14 @@ function mergeLedgers(local, remote) {
   (local.expenses || []).forEach(expense => {
     if (expense && typeof expense === 'object' && expense.id && !byId.has(expense.id)) byId.set(expense.id, expense);
   });
-  return { salaries, expenses: [...byId.values()] };
+  const additionsById = new Map();
+  (remote.additions || []).forEach(item => {
+    if (item && typeof item === 'object' && item.id) additionsById.set(item.id, item);
+  });
+  (local.additions || []).forEach(item => {
+    if (item && typeof item === 'object' && item.id && !additionsById.has(item.id)) additionsById.set(item.id, item);
+  });
+  return { salaries, expenses: [...byId.values()], additions: [...additionsById.values()] };
 }
 
 function friendlyError(error) {

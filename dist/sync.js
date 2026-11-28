@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
 import { doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -78,6 +78,10 @@ export async function createCloudSync(callbacks) {
     signIn: async (email, password) => {
       if (email.trim().toLowerCase() !== OWNER_EMAIL) throw new Error('This account is not allowed to use this app.');
       return signInWithEmailAndPassword(auth, email, password);
+    },
+    requestPasswordReset: async email => {
+      if (email.trim().toLowerCase() !== OWNER_EMAIL) return;
+      await sendPasswordResetEmail(auth, OWNER_EMAIL);
     },
     signOut: async () => {
       if (!await push(normalizeSyncData(callbacks.getLocalData()), true)) {

@@ -208,6 +208,22 @@ $('settingsBtn').addEventListener('click',()=>$('settingsDialog').showModal());d
 $('syncStatusBtn').addEventListener('click',openAuthDialog);
 $('gateSignInBtn').addEventListener('click',openAuthDialog);
 $('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!cloudApi){$('authError').textContent='Sign-in is unavailable right now.';return;}$('authError').textContent='';const email=$('authEmail').value.trim(),password=$('authPassword').value;try{await cloudApi.signIn(email,password);$('authPassword').value='';$('authDialog').close();showToast('Signed in. Records are syncing.');}catch(error){$('authError').textContent=authErrorMessage(error);}});
+$('resetPasswordBtn').addEventListener('click',async()=>{
+  const email=$('authEmail').value.trim();
+  $('authError').textContent='';$('resetStatus').hidden=true;
+  if(!email||!$('authEmail').checkValidity()){$('authError').textContent='Enter your email address first.';$('authEmail').focus();return;}
+  if(!cloudApi){$('authError').textContent='Password reset is unavailable right now.';return;}
+  const button=$('resetPasswordBtn');button.disabled=true;
+  try{
+    await cloudApi.requestPasswordReset(email);
+    $('resetStatus').textContent='If this is the owner account, a password reset link has been sent. Check your inbox and spam folder.';
+    $('resetStatus').hidden=false;
+    setTimeout(()=>{button.disabled=false;},60000);
+  }catch(error){
+    button.disabled=false;
+    $('authError').textContent=error?.code?.includes('too-many-requests')?'Too many requests. Try again later.':'Could not send the reset email. Please try again later.';
+  }
+});
 $('syncNowBtn').addEventListener('click',async()=>{if(!cloudApi||!cloudUser){$('authDialog').close();showToast('Sign in to sync your records.');return;}const saved=await cloudApi.syncNow();$('authDialog').close();showToast(saved?'Cloud sync refreshed.':'Cloud sync failed. Check your connection.');});
 $('signOutBtn').addEventListener('click',async()=>{if(!cloudApi){$('authDialog').close();return;}try{await cloudApi.signOut();$('authDialog').close();showToast('Signed out. This device copy was removed.');}catch(error){$('authError').textContent=authErrorMessage(error);showToast(authErrorMessage(error));}});
 $('clearDataBtn').addEventListener('click',()=>{if(confirm('Clear every salary and expense? Export first if you need a backup.')){state.salaries={};state.expenses=[];saveState();$('settingsDialog').close();showToast('Device data cleared. Cloud sync is pending.');}});

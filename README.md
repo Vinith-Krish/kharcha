@@ -22,5 +22,5 @@ npx serve dist
 
 ## Privacy
 
-Expense records require sign-in. Data access is enforced by the database rules, which must be deployed separately from the website.
+Expense records require sign-in. Sign-in ends when the browser session closes. Data access is enforced by the database rules, which must be deployed separately from the website. Sign out before leaving a shared device; doing so clears its local copy.
 

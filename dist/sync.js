@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
+import { browserSessionPersistence, getAuth, inMemoryPersistence, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
 import { doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -8,6 +8,7 @@ const OWNER_UID = '2pwPvR1h1FRxXgux3Z9Xsn2jPlj2';
 export async function createCloudSync(callbacks) {
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  await setPersistence(auth, browserSessionPersistence).catch(() => setPersistence(auth, inMemoryPersistence));
   const db = getFirestore(app);
   let currentUser = null;
   let unsubscribe = null;
